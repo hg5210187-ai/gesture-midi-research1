@@ -162,3 +162,50 @@ Headless test feeding fake YOLO results through `process()`:
   read as the right hand — unavoidable without true handedness (the model lost the
   left/right label the legacy MediaPipe backend had). Mitigated in practice by the
   mirror view (left hand naturally sits on the left).
+
+---
+
+# Follow-up — Visible pitch overlay (readout box + sampling line + region label)
+
+_Date: 2026-06-17_
+
+## Request
+
+The pitch readout was small text tucked in the top-left corner. Make it visible;
+show it in a box; draw the mid-Y line where pitch is determined; and label the
+region so the user knows where to put their hand.
+
+## Changes
+
+`src/overlay.py` — replaced the corner text with a **current-pitch feedback
+suite**, drawn when `show_pitch` is on:
+
+1. **Active region** — highlights the scale band the hand is in
+   (`idx = int(last_hand_y_norm * len(scale))`) with a translucent green fill and
+   a note label (`> A4`). Scale mode only. Helps dense scales too (the borderline
+   labels only render for ≤24-note scales; this always labels the active band).
+2. **Mid-Y sampling line** — yellow full-width line at the right box's Y-midpoint
+   (`(y1+y2)/2`), the exact point pitch is read from, with a `pitch` tag.
+3. **Pitch readout box** — large, top-centre, translucent bg + green border/text,
+   `NoteName+Octave (Freq Hz)`.
+
+Added helpers `_fill_band` and `_draw_label_box` (translucent, on-screen-clamped).
+
+`src/logic.py` — `show_pitch` now defaults to **True** so the suite is visible
+out of the box. `src/ui.py` — `show_pitch_check.select()` so the checkbox matches.
+
+## Verification
+
+Headless render onto a synthetic 480×640 frame:
+- Mid-Y line: 640 yellow px across row 240 (= 0.5·H, the box midpoint). ✓
+- Active band: ~11.6k green-tint px in the expected band rows. ✓
+- Pitch box: green border/text px in the top-centre strip. ✓
+- Theremin mode, no-hand frame, and `show_pitch=False` all render without error.
+- `py_compile` on `overlay.py`, `ui.py`, `logic.py` — OK.
+
+## Notes
+
+- The whole suite is gated by **Show Current Pitch**; **Show Note Borderlines**
+  (all band boundaries) remains a separate toggle.
+- In Theremin mode the region highlight is skipped (continuous pitch, no bands)
+  and the readout box still shows the held base note (C4) by design.
