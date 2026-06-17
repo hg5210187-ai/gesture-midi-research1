@@ -113,3 +113,52 @@ affect the local plan or implementation.
   overlays, looper).
 - Commit the changes.
 - Optionally tune the Volume Sensitivity range against real calibrated areas.
+
+---
+
+# Follow-up — Phantom-detection fix (right hand makes sound when not shown)
+
+_Date: 2026-06-17_
+
+## Symptom
+
+Sound was produced even when the user's right hand was **not** in frame.
+
+## Root cause
+
+The hand-pose model (`yolov8n-hand-pose.pt`) has a **single class** (`{0: 'hand'}`),
+so `GestureLogic` assigns hand roles purely by box center-x: any single box with
+`cx ≥ 0.5` is treated as the right hand and immediately plays a note. Inference ran
+at YOLO's **default confidence (0.25)**, which is permissive enough to hallucinate a
+"hand" from a face/shoulder/background. A phantom box on the right half → note on,
+with no hand actually up.
+
+## Fix
+
+`src/logic.py` — added a `min_confidence = 0.5` threshold and filter detections by
+`boxes.conf` at the top of `process()` **before** any hand is assigned a role.
+Boxes below threshold are dropped; if all are dropped the frame is treated as
+"no hands". Keypoints are filtered with the same mask to stay index-aligned.
+Refactored the duplicated no-hands reset into `_reset_no_hands()`.
+
+- Guarded with `getattr(boxes, "conf", None)` so mock results without `.conf`
+  (and the synthetic harness) are unaffected.
+- `run_benchmark.py` feeds real YOLO results (carry `.conf`) → benefits from the
+  gate; `run_dry_run.py` never calls `process()` → unaffected.
+
+## Verification
+
+Headless test feeding fake YOLO results through `process()`:
+- Low-conf (0.30) right-side box → **no** note, `current_pitch_note == -1`.
+- High-conf (0.90) right-side box → note plays as before.
+- `python -m py_compile src/logic.py` — OK.
+
+## Notes / possible follow-ups
+
+- `min_confidence` is a tunable `GestureLogic` attribute (default 0.5). If a real
+  hand is occasionally missed, lower it; if phantoms persist, raise it. Could be
+  exposed in the UI later.
+- This does **not** address a *real* left hand drifting onto the right half being
+  read as the right hand — unavoidable without true handedness (the model lost the
+  left/right label the legacy MediaPipe backend had). Mitigated in practice by the
+  mirror view (left hand naturally sits on the left).
