@@ -237,3 +237,57 @@ Headless render onto a 480×640 frame:
 - IDLE / RECORDING / PLAYING each draw the badge in the correct colour. ✓
 - `looper=None` renders without error. ✓
 - `py_compile src/overlay.py` — OK.
+
+---
+
+# Follow-up — Highest/lowest notes were unreachable (no sound at extremes)
+
+_Date: 2026-06-17_
+
+## Symptom
+
+The top and bottom scale notes (and the borderline regions near the frame
+edges) never made sound.
+
+## Root cause
+
+Pitch is read from the bounding-box **center**, which can't reach the frame
+edges — it's always ≥ half a box-height (`~0.15`) from top/bottom. So the
+outer `1/n` screen strips (the first/last notes) are unreachable. Confirmed
+geometrically: for a 0.30-tall box the center only spans `y ∈ [0.15, 0.85]`,
+but the top note needs `y ≥ (n-1)/n` and the bottom note `y < 1/n` — both
+outside that range, and worse for denser scales (n=13 → need 0.923 / 0.077).
+
+## Fix
+
+`src/logic.py` — added `play_margin = 0.15` and `_stretch_reach(y)`, which
+remaps the reachable middle band `[margin, 1-margin]` back to the full `[0, 1]`
+range (clamped). Applied in the live (legacy) path only — the
+experiment/benchmark path keeps the raw position (its cm-per-octave mapping
+assumes 0.5 = centre). Restructured `_process_right_hand` to compute
+`use_experiment` once, up front.
+
+`src/overlay.py` — added `_band_screen_y(y_play, margin, h)` and routed the
+borderlines + active-region highlight through it with the same `play_margin`,
+so the drawn bands line up exactly with where notes change. The box-center
+"pitch" line aligns with the bands because the mapping is linear in screen
+position (margin only relocates the dead zones to the very top/bottom, where no
+notes live). `margin == 0` reduces to the old `(1 - y_play) * h`.
+
+## Verification
+
+Headless, default chromatic scale (13 notes, [45..57]):
+- Hand at TOP → note 57 (highest); hand at BOTTOM → note 45 (lowest). ✓
+- Box-center pitch line falls inside the highlighted band at 5 sampled
+  positions (overlay/sound stay aligned). ✓
+- Theremin: full pitch bend now reachable at the extremes (+8191 / −8192). ✓
+- Experiment/benchmark path keeps the raw `last_hand_y_norm` (no stretch). ✓
+- `py_compile src/logic.py src/overlay.py` — OK.
+
+## Notes
+
+- `play_margin` (0.15) is tunable. It must be ≥ the typical box half-height for
+  the extremes to be reachable; the playable region is the central
+  `(1 - 2·margin)` of the frame. Very dense scales with a large (close) hand box
+  may still not reach the literal first/last note — raise `play_margin` or use a
+  narrower pitch range if needed.
