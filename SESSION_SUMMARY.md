@@ -209,3 +209,31 @@ Headless render onto a synthetic 480×640 frame:
   (all band boundaries) remains a separate toggle.
 - In Theremin mode the region highlight is skipped (continuous pitch, no bands)
   and the readout box still shows the held base note (C4) by design.
+
+---
+
+# Follow-up — Looper status on the video overlay
+
+_Date: 2026-06-17_
+
+## Request
+
+Show the looper status on the video feed (it was only in the settings panel,
+but the user watches the video while gesturing).
+
+## Change
+
+`src/overlay.py` — added an always-on **looper status badge** at the top-left:
+a solid colour-filled box (`_draw_status_badge`) reading `LOOP: <state>`,
+colour-coded to match the UI label — gray IDLE, red RECORDING, green PLAYING
+(`_LOOP_COLORS`). State is read from `logic.looper.state`; guarded with
+`getattr` so `looper=None` (e.g. `run_benchmark.py`) is safe. Placed in the
+top-left spot freed when the pitch readout moved to top-centre — no conflict
+with the pitch box (centre), mid-Y line, or region label.
+
+## Verification
+
+Headless render onto a 480×640 frame:
+- IDLE / RECORDING / PLAYING each draw the badge in the correct colour. ✓
+- `looper=None` renders without error. ✓
+- `py_compile src/overlay.py` — OK.
