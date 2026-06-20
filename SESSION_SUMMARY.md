@@ -291,3 +291,54 @@ Headless, default chromatic scale (13 notes, [45..57]):
   `(1 - 2·margin)` of the frame. Very dense scales with a large (close) hand box
   may still not reach the literal first/last note — raise `play_margin` or use a
   narrower pitch range if needed.
+
+---
+
+# Session — 2026-06-20: Volume gate, UI features, performance
+
+## 1. Volume gate (crisp note on/off)
+
+`src/logic.py` — added `self.volume_gate` (0–127, default 8). In
+`_process_right_hand` the area→volume is now computed *before* the note logic;
+when `volume <= volume_gate` the note is fully released (`note_off`,
+`current_pitch_note = -1`, CC7→0) instead of just made quiet, so fast in/out
+hand moves switch the sound cleanly on/off. Exposed as a **Volume Gate** slider
+in the UI; applied via `main.update_settings`.
+
+Adversarial-review fixes (multi-agent review, 3/10 findings confirmed):
+- Pitch bend is now gated on `gate_open` so theremin/continuous bends aren't
+  sent/recorded into a loop while no note sounds; `_last_recorded_pitch` re-arms
+  on gate close.
+- Removed the redundant unconditional theremin `note_off` in
+  `_silence_right_hand` (the guarded release already covers the base note).
+
+## 2. UI (`src/ui.py`)
+
+- **Fullscreen**: window opens maximised; `⛶ Fullscreen` button / **F11** toggle
+  true fullscreen, **Esc** exits. `update_image` now scales the feed to the
+  video panel (was fixed 700px).
+- **Sidebar toggle**: top bar with `☰ Hide/Show Settings` and an "Always show
+  settings" pin checkbox (pinned by default = legacy behaviour). Sidebar is now
+  a `CTkScrollableFrame`.
+- **Instrument**: GM instrument dropdown → `MidiEngine.send_program_change`
+  (new), sent on channel 0 and the looper channel only on change.
+  ⚠️ GarageBand ignores Program Change for instrument switching (non-standard
+  MIDI impl); works with GM destinations via IAC.
+
+## 3. Performance — make it lighter (Apple Silicon)
+
+`src/vision_ultralytics.py` — Ultralytics defaulted to **CPU @ imgsz=640**,
+pinning multiple cores. Now: auto-select **MPS** (GPU) with CPU fallback,
+**imgsz=384**, camera capture **640×480**, one-time warmup. `main.py` vision
+loop paced to `self.target_fps` (default **20**) so it stops producing frames
+the UI never shows.
+
+Measured (headless vision loop, `(user+sys)/real` cores):
+
+| Config | avg cores | CPU/frame |
+|---|---|---|
+| Old: CPU / 640 / uncapped | 1.70 | ~272 ms |
+| New: MPS / 384 / 20 fps | 0.74 | ~62 ms |
+
+Full app incl. UI ≈ **1.15 cores** (was ~2). `self.target_fps` is the single
+knob: raise toward 30 for snappier response, lower for less power.
