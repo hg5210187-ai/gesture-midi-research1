@@ -342,3 +342,16 @@ Measured (headless vision loop, `(user+sys)/real` cores):
 
 Full app incl. UI ≈ **1.15 cores** (was ~2). `self.target_fps` is the single
 knob: raise toward 30 for snappier response, lower for less power.
+
+## 4. Off-thread settings handler (dropdown lag)
+
+`src/ui.py` — settings-change callbacks (Instrument dropdown, sliders) ran
+synchronously on the Tk main thread, so each change blocked the UI on the MIDI
+program change + scale regeneration. Added a daemon **worker thread**
+(`_settings_worker`) fed by a `queue.Queue`: `_update_settings` still reads
+widget values on the main thread (Tk isn't thread-safe) and updates the gate
+label, then enqueues a full settings snapshot; the worker runs the non-UI
+`on_change_callback` off-thread. Rapid changes **coalesce to the newest** queued
+snapshot (each dict is a complete state snapshot, so newest-wins never drops a
+setting). `on_calibrate` still runs on the main thread (it touches Tk via
+`set_calib_status`).
