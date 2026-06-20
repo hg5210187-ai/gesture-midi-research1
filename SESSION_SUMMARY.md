@@ -355,3 +355,49 @@ label, then enqueues a full settings snapshot; the worker runs the non-UI
 snapshot (each dict is a complete state snapshot, so newest-wins never drops a
 setting). `on_calibrate` still runs on the main thread (it touches Tk via
 `set_calib_status`).
+
+---
+
+# Session — Point GUI app at Homebrew Python 3.12
+
+_Date: 2026-06-20_
+
+## Request
+
+> I want to point the GUI application in this project to the homebrew version of
+> python. (Follow-up to wanting to remove the anaconda install.)
+
+## Context found
+
+- The project's `.venv` was **not** anaconda — it ran on a uv-managed standalone
+  CPython 3.12.12 (`~/.local/share/uv/python/...`), so `uv run python main.py`
+  was already anaconda-free. The "on anaconda" feeling came from the interactive
+  shell `python` resolving to `/opt/anaconda3/bin/python` (conda base is
+  auto-activated in `.zshrc`/`.bash_profile`).
+- Homebrew `python@3.12`/`@3.14` ship **without `_tkinter`**, which the
+  customtkinter GUI needs. Only `python-tk@3.14` was installed (covers 3.14).
+  The project is pinned to 3.12 (`.python-version`, `requires-python>=3.12`) and
+  mediapipe/opencv/python-rtmidi have no 3.14 wheels, so 3.12 is required.
+
+## Change
+
+- `brew install python-tk@3.12` — gives Homebrew's `python@3.12` its `_tkinter`.
+- `pyproject.toml`: added `[tool.uv] python-preference = "only-system"` so uv
+  uses Homebrew's `python@3.12` (per `.python-version = 3.12`) instead of a
+  downloaded interpreter — durable across future `uv venv`/`uv sync`.
+- Recreated the venv on Homebrew 3.12:
+  `uv venv --python /opt/homebrew/bin/python3.12 --clear` then `uv sync`.
+
+## Verification
+
+`.venv/bin/python` → `base_prefix /opt/homebrew/opt/python@3.12/...` (3.12.13).
+All deps import (tkinter Tk 9.0, customtkinter 5.2.2, cv2 4.13.0, mediapipe
+0.10.32, mido, rtmidi 1.5.8, ultralytics 8.4.7, torch 2.9.1, PIL 12.1.0). The
+project `main` import graph loads; a `customtkinter.CTk()` root was created +
+destroyed OK. `uv run python …` resolves to the Homebrew venv.
+
+## Open item
+
+Anaconda removal (`/opt/anaconda3`, 6.9 GB; envs base/examplegame/virtualhand;
+conda init blocks in `.zshrc`/`.bash_profile`) was **not** performed — awaiting
+confirmation. This project no longer depends on it.
