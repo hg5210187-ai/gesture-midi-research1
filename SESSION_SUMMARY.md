@@ -518,3 +518,20 @@ Start commands (different per program, as requested):
   → note + rotation stored).
 - `run_benchmark.py` imports resolve to the working module. Reference map:
   working modules ← `main.py`+`run_benchmark.py`; OBB modules ← `main_obb.py`.
+
+## Follow-up — OBB phantom rejection (curtains detected as a hand)
+
+`main_obb.py` fired on textured background (curtains/blinds) with no hand up,
+playing a note. Added phantom-rejection gates in `src/logic_obb.py`
+`_extract_right_obb` (OBB program only — `src/logic.py` untouched):
+- `min_confidence` 0.5 → **0.6** (kept modest; the model under-detects real
+  hands, so a high value hurts true positives).
+- new `max_box_area` = **0.30** — reject boxes too large to be a real hand at
+  playing distance (calibrated min area ≈ 0.04). Doesn't hurt recall (real
+  hands are small). `None` disables.
+- `OBB_DEBUG=1` env var prints `conf/area/cx/cy` per detection for tuning:
+  `OBB_DEBUG=1 uv run python main_obb.py`.
+
+Defaults are a first cut — exact thresholds need the OBB_DEBUG numbers for the
+phantom vs a real hand. If they overlap on both conf and area, the real fix is
+more negative-sample training data (already planned).
