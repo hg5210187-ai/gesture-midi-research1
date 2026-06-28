@@ -401,3 +401,67 @@ destroyed OK. `uv run python …` resolves to the Homebrew venv.
 Anaconda removal (`/opt/anaconda3`, 6.9 GB; envs base/examplegame/virtualhand;
 conda init blocks in `.zshrc`/`.bash_profile`) was **not** performed — awaiting
 confirmation. This project no longer depends on it.
+
+---
+
+# Session — Integrate self-trained right-hand YOLO-OBB model (two-model setup)
+
+_Date: 2026-06-28_
+
+## Request
+
+> I have trained a YOLO model that can detect my right hand. I am going to
+> import that. (See `SESSION_SUMMARY_EN.md` for the training write-up.)
+
+Implements the "Next Step — Mac App Integration" from `SESSION_SUMMARY_EN.md`:
+right hand → self-trained **YOLO11n-OBB** model; left hand stays on the existing
+`yolov8n-hand-pose.pt`. Both models run on the same mirrored frame.
+
+## Changes
+
+- **`src/vision_ultralytics.py`** — loads **two** models (pose + OBB).
+  `get_frame()` now returns `(success, frame, (pose_result, obb_result))`.
+  Graceful degradation: if `right_hand_obb.pt` is missing, the app still runs
+  (left hand/looper) with a loud warning and `obb_result=None`. MPS→CPU
+  fallback applies per model. New `pose_every_n` ctor arg (default **1** =
+  both-every-frame) throttles the pose model with last-result reuse to claw
+  back the doubled inference cost when needed.
+- **`src/logic.py`** — `process()` consumes the `(pose, obb)` pair.
+  `_extract_right_obb` reads the right hand from `obb.xywhr`/`xyxyxyxyn`
+  (normalized via `orig_shape`): pitch ← center-Y, volume ← **rotation-
+  invariant** area `w*h`, rotation (radians) stored in `last_right_rotation`
+  for a future tilt param. `_extract_left_pose` reads the left hand/keypoints.
+  `_process_right_hand(y_center, area)` replaces the old bbox-based signature.
+- **`src/overlay.py`** — draws the **rotated** OBB polygon for the right hand
+  (`_draw_obb`), falling back to the axis-aligned box.
+
+## Model file
+
+Default path `right_hand_obb.pt` in the project root (resolved relative to repo
+root). User copies it from Drive `MyDrive/midi_hand_model/right_hand_obb.pt`.
+Not yet present in the repo at time of writing → right hand latent until added.
+
+## Verification
+
+- Synthetic end-to-end test (no camera/model): pitch, rotation-invariant
+  volume, rotation capture, fist→looper, right-side-box rejection, phantom
+  drop, note release, overlay render — **all pass**.
+- Adversarial multi-agent review (4 confirmed findings, all fixed):
+  1. **Spurious looper toggle** on a 1-frame fist-detection dropout (also a
+     latent pre-existing bug) → fist-release **debounce**
+     (`_fist_release_frames=3`).
+  2. **Missing `cx≥0.5` guard** on the OBB right hand (asymmetric with the left
+     extractor) → mirrored the guard so a left-half OBB can't play pitch.
+  3. **One per-frame exception bricked the vision thread** (whole loop in one
+     try/except with `cleanup()` in `finally`) → per-frame try/continue, bail
+     only after 60 consecutive errors.
+  4. **Two inferences/frame > 50 ms budget** (single-model baseline already
+     ~62 ms) → `pose_every_n` cadence knob; recommend setting it to 2–3 once
+     the model is in and FPS is measured.
+- Post-fix synthetic suite (incl. debounce + cx-guard tests) — **all pass**.
+
+## Open / next
+
+- Drop `right_hand_obb.pt` into the project root and run `uv run python main.py`.
+- Wire the stored `last_right_rotation` to a MIDI parameter (tilt) — deferred.
+- Consider `pose_every_n=2` if effective FPS is below the 20 fps target.
