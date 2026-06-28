@@ -535,3 +535,29 @@ playing a note. Added phantom-rejection gates in `src/logic_obb.py`
 Defaults are a first cut — exact thresholds need the OBB_DEBUG numbers for the
 phantom vs a real hand. If they overlap on both conf and area, the real fix is
 more negative-sample training data (already planned).
+
+## Follow-up 2 — phantom also on main.py (pose model); live confidence + sustained fist
+
+User confirmed the phantom also occurs on `main.py` (the WORKING program), so the
+`yolov8n-hand-pose.pt` model itself hallucinates a hand on background/face. A
+multi-agent investigation (5 agents) confirmed: the box is a **model false
+positive, not an assignment/overlay bug**; the stuck `LOOP: RECORDING` **is** a
+bug — a one-frame phantom fist tripped the looper toggle. Fixes applied to BOTH
+programs:
+- **Live "Detection Confidence" slider** (`src/ui.py`, default 0.60, range
+  0.30–0.90) → `settings["detection_confidence"]` → `logic.min_confidence` in
+  both `main.py` and `main_obb.py` `update_settings`. The user drags it up until
+  the phantom disappears, in real time, no restart. Shared UI; both logic
+  modules already have `min_confidence`, so no guard needed.
+- **Sustained-fist gate** (`src/logic.py` + `src/logic_obb.py`
+  `_process_left_hand`): the fist must be held `_fist_confirm_frames`=3
+  consecutive frames before it toggles the looper, so a one-frame phantom can't.
+  `_fist_frames` resets on open hand / hand-absent / no-hands.
+- **`HAND_DEBUG=1`** env logging added to `src/logic.py` (mirrors OBB_DEBUG):
+  prints every raw pose detection's conf/area/cx/cy for tuning.
+
+Verified: compile; sustained-fist (1–2 frames ignored, 3rd toggles, hold doesn't
+re-fire) in both modules; confidence wiring; working-version note regression.
+Honest limit: if the phantom and a real hand only separate at a confidence so
+high that the real hand stops registering, the model needs more negative-sample
+training data.
