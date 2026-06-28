@@ -462,6 +462,59 @@ Not yet present in the repo at time of writing → right hand latent until added
 
 ## Open / next
 
-- Drop `right_hand_obb.pt` into the project root and run `uv run python main.py`.
+- Drop `right_hand_obb.pt` into the project root and run `uv run python main_obb.py`.
 - Wire the stored `last_right_rotation` to a MIDI parameter (tilt) — deferred.
 - Consider `pose_every_n=2` if effective FPS is below the 20 fps target.
+
+---
+
+# Session — Split into two independent programs (working vs OBB)
+
+_Date: 2026-06-28_
+
+## Request
+
+> The [OBB] hand is not detected enough. Although I want to improve, I need a
+> working program right now. Therefore can you separate the files? The one that
+> imported my trained model and the previous one which worked. Make the python
+> code to start each program different.
+
+The trained OBB model under-detects, so the two pipelines are split into two
+fully independent, separately-launched programs that share no vision/logic code
+(improving one can't break the other). MIDI, looper, UI, scales, and overlay
+stay shared.
+
+## Layout
+
+| Program | Entry | Vision | Logic | Hands |
+|---|---|---|---|---|
+| **Working** (reliable) | `main.py` | `src/vision_ultralytics.py` | `src/logic.py` | one pose model → both hands |
+| **OBB** (experimental) | `main_obb.py` | `src/vision_obb.py` | `src/logic_obb.py` | trained OBB → right; pose → left |
+
+Start commands (different per program, as requested):
+- Working: `uv run python main.py`
+- OBB:     `uv run python main_obb.py`
+
+## How it was done
+
+- `src/logic.py` + `src/vision_ultralytics.py` were **restored to the original
+  single-pose-model code** (the version that worked before the OBB session).
+- The OBB two-model code was copied verbatim into `src/logic_obb.py` +
+  `src/vision_obb.py`; `main_obb.py` (a copy of the OBB `main`) imports those.
+- `src/overlay.py` stays shared — it draws the rotated OBB when
+  `last_right_obb` is present (OBB program) and falls back to the axis-aligned
+  box otherwise (working program), so one overlay serves both.
+- `run_benchmark.py` imports `src.vision_ultralytics`/`src.logic`, so it now
+  rides the **working** single-model path again (its original design).
+
+## Verification
+
+- All entry points + modules compile.
+- Wiring asserted: `main.py`→`src.vision_ultralytics`/`src.logic`;
+  `main_obb.py`→`src.vision_obb`/`src.logic_obb`. Constructor signatures differ
+  (working `model_variant`; OBB `pose_model`/`obb_model`/`pose_every_n`).
+- Behavioral synthetic tests pass for BOTH: working (single result → right hand
+  from bbox plays a note, left fist toggles looper) and OBB (`(pose,obb)` tuple
+  → note + rotation stored).
+- `run_benchmark.py` imports resolve to the working module. Reference map:
+  working modules ← `main.py`+`run_benchmark.py`; OBB modules ← `main_obb.py`.
