@@ -561,3 +561,57 @@ re-fire) in both modules; confidence wiring; working-version note regression.
 Honest limit: if the phantom and a real hand only separate at a confidence so
 high that the real hand stops registering, the model needs more negative-sample
 training data.
+
+---
+
+# Session — Third program: MediaPipe detector (phantom-resistant)
+
+_Date: 2026-06-28_
+
+## Request
+
+> I think it is a risk to change it to media pipe. So, can you make a file that
+> uses media pipe? Leaving a file of also a YOLOv8 hand pose.
+
+The YOLOv8 hand-pose model hallucinates hands on background/face (root cause of
+the phantom notes). MediaPipe's palm-detector pipeline is far more robust. Added
+as a THIRD, fully separate program; the YOLO version is untouched.
+
+## Layout (now three programs)
+
+| Program | Entry | Detector | Vision | Logic |
+|---|---|---|---|---|
+| YOLO hand-pose | `main.py` | `yolov8n-hand-pose.pt` | `src/vision_ultralytics.py` | `src/logic.py` |
+| Trained OBB | `main_obb.py` | `right_hand_obb.pt` + pose | `src/vision_obb.py` | `src/logic_obb.py` |
+| **MediaPipe** (new) | `main_mediapipe.py` | MediaPipe HandLandmarker | `src/vision_mediapipe.py` | reuses `src/logic.py` |
+
+Run: `uv run python main_mediapipe.py`
+
+## How it was done
+
+- `src/vision_mediapipe.py` wraps the MediaPipe **Tasks** `HandLandmarker` and
+  emits a **duck-typed Ultralytics Results** (`_Boxes.xyxyn/.conf`,
+  `_Keypoints.xyn`, `.cpu().numpy()`), so the EXISTING, tested `GestureLogic` +
+  overlay run unchanged — only the detector differs (no new logic file).
+- Each hand -> bbox from landmark extents (pitch/volume) + 21 landmarks (fist).
+  Frame mirrored; left/right still by center-x.
+- `main_mediapipe.py` = copy of `main.py` with the vision import/instantiation
+  swapped; reuses `from src.logic import GestureLogic`. Zero changes to the YOLO
+  files.
+
+## Environment note (important)
+
+This build of `mediapipe==0.10.32` ships **only the Tasks API** — the legacy
+`mediapipe.solutions.hands` is absent (so the old `src/vision.py` would fail
+here too; that explains earlier confusion about the "older version"). The Tasks
+HandLandmarker needs a model bundle: **`hand_landmarker.task`** (7.8 MB,
+downloaded to the project root from
+`storage.googleapis.com/mediapipe-models/.../hand_landmarker.task`). The vision
+module raises a clear error with the curl command if it's missing.
+
+## Verification
+
+- Compile; HandLandmarker VIDEO pipeline creates + processes frames; **0 hands
+  on a blank frame** (no false positive). MediaPipe duck-typed result plays a
+  note through `GestureLogic`; fist (held 3 frames) toggles looper. YOLO files
+  unchanged.
