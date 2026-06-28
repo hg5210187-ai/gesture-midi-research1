@@ -615,3 +615,14 @@ module raises a clear error with the curl command if it's missing.
   on a blank frame** (no false positive). MediaPipe duck-typed result plays a
   note through `GestureLogic`; fist (held 3 frames) toggles looper. YOLO files
   unchanged.
+
+## Follow-up — removed the Detection Confidence slider
+
+Per user request, the live "Detection Confidence" slider (added in "Follow-up 2"
+above) was **removed**: the label/slider/hint from `src/ui.py`, the
+`detection_confidence` key from its settings dict, and the
+`min_confidence = settings.get(...)` wiring from `main.py`/`main_obb.py`/
+`main_mediapipe.py`. The internal `min_confidence` defaults stay (0.5 YOLO / 0.6
+OBB) — just no longer live-tunable. (MediaPipe is now the phantom-resistant
+path, so live confidence tuning was no longer needed.) The sustained-fist gate
+and `HAND_DEBUG`/`OBB_DEBUG` logging remain.
