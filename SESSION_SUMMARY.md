@@ -679,3 +679,25 @@ camera's internal delay and Cubase's audio buffer.
   looper is on channel 2 (track channel `1` merges, `Any` needs a slot-2 sound);
   CC7 every frame fills recordings; ±2 semitone bend range assumed.
 
+## Follow-up — deployed `hbb-s-fold1-320.pt` in `main_obb.py`
+
+- The model is a YOLO26s **detect** model (plain boxes, trained at 320) with
+  classes `thumbout` / `openhand` / `closedhand`, so ONE model now covers both
+  hands: right-hand box -> pitch (Y-center) + volume (area); left-hand
+  `closedhand` -> looper toggle. The pose model and its worker thread are no
+  longer used by `main_obb.py`.
+- New `src/vision_hbb.py` (`HbbVision`; env `HBB_MODEL`, `HBB_IMGSZ`,
+  `HBB_DEVICE`). Camera thread moved to a shared `LatestFrameCamera` base in
+  `src/vision_obb.py`; the two-model `UltralyticsVision` is kept there, unused.
+- `src/logic_obb.py`: `process()` takes a bare detect result ->
+  `_extract_gesture_boxes`; `_process_left_hand` now takes the fist bool.
+- Measured in the real app on the M4 (PyTorch): MPS ~16-22 ms inference,
+  ~18-24 ms frame->MIDI; CPU ~22-24 ms. **Not 7.93 ms** — `results.jsonl` shows
+  that study ran on an RTX 4090. This is about the same as the previous
+  two-model setup (~18 ms), not faster. CoreML export is the untried next step
+  (`coremltools` is not installed).
+- Verified with synthetic boxes (note on/off, CC7, 5-frame fist toggle,
+  cooldown, confidence/area gates, overlay) and a 24 s app run per device. Not
+  verified with real hands or sound. `min_confidence` 0.6 / `max_box_area` 0.30
+  were tuned for the old OBB model; volume needs re-calibrating (box shape differs).
+
