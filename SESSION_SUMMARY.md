@@ -701,3 +701,20 @@ camera's internal delay and Cubase's audio buffer.
   verified with real hands or sound. `min_confidence` 0.6 / `max_box_area` 0.30
   were tuned for the old OBB model; volume needs re-calibrating (box shape differs).
 
+## Follow-up — Core ML export of `hbb-s-fold1-320` (now the default)
+
+- `uv add coremltools "numpy<=2.3.5"`. NumPy 2.4.1 broke the coremltools
+  export ("only 0-dimensional arrays can be converted") and made Ultralytics'
+  Core ML loader attempt a pip AutoUpdate at startup; 2.3.5 fixes both.
+- Export: `uv run yolo export model=hbb-s-fold1-320.pt format=coreml imgsz=320`
+  -> `hbb-s-fold1-320.mlpackage` (18 MB). `HbbVision` uses it when present,
+  else the `.pt`.
+- Measured on the M4: model alone ~2.3 ms/frame (PyTorch 16-22 ms). In the real
+  app at 30 fps: inference 6-7.6 ms mean, frame delivered -> MIDI 8-9.6 ms mean
+  (was ~18 ms). Occasional single-frame spikes of 50-120 ms remain.
+- `.pt` vs Core ML on 300 dataset images at conf >= 0.6: same count+classes on
+  278; Core ML found fewer boxes (44 vs 53) and confidences differ by 0.07 on
+  average (max 0.24), box coordinates by <= 0.025. If hands drop out, lower
+  `min_confidence` (0.6) in `logic_obb.py`; `OBB_DEBUG=1` prints each detection.
+- Still not verified with real hands or sound.
+
