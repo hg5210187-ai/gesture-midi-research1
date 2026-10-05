@@ -626,3 +626,56 @@ above) was **removed**: the label/slider/hint from `src/ui.py`, the
 OBB) — just no longer live-tunable. (MediaPipe is now the phantom-resistant
 path, so live confidence tuning was no longer needed.) The sustained-fist gate
 and `HAND_DEBUG`/`OBB_DEBUG` logging remain.
+
+---
+
+# Session — Cubase output + low-latency vision loop (2026-10-05)
+
+## Request
+
+Switch the MIDI destination from GarageBand to Cubase, check latency and side
+effects, then cut camera + inference + loop latency (goal stated: < 10 ms whole
+system). Entry point in use: `main_obb.py`.
+
+## Findings
+
+- The app was already sending to `IAC Driver Bus 1` (only port present; the
+  "GarageBand" name match never fired). Cubase LE AI Elements 13 + HALion Sonic
+  are installed and can listen to the same bus. IAC loopback: 0.15 ms median.
+- **< 10 ms is not reachable with a camera**: the camera delivers 30 fps
+  (33.3 ms/frame; a 60 fps request is refused). Options given: A software only,
+  B + 120 fps USB camera (est. ~12 ms avg), C non-camera sensor (only way under
+  10 ms). **A was implemented**; `CAMERA_INDEX`/`CAMERA_FPS` make B a config change.
+
+## Changes
+
+- `src/midi_engine.py`: `MIDI_PORT` env override; IAC -> virtual -> first port;
+  GarageBand branch removed.
+- `src/vision_obb.py`: capture thread keeps only the newest frame; `get_frame()`
+  blocks for a NEW frame and runs only the right-hand OBB; left-hand pose runs
+  in its own worker thread (`pose_every_n` removed). OBB on **CPU**, pose on
+  **MPS** — sharing one device doubled OBB time (~14 -> ~28 ms), and OBB on MPS
+  stalled when the UI redrew. `OBB_IMGSZ` env; `last_capture_ts`/`last_infer_ms`.
+- `main_obb.py`: 20 FPS cap removed (loop runs at camera rate);
+  `MIDI_LATENCY_DEBUG=1` readout; vision thread joined before exit (exiting
+  mid-inference crashed torch).
+- `src/logic_obb.py`: fist confirm/release 3 -> 5 frames (same ~150 ms at 30 fps).
+
+## Measured (M4 Air, built-in camera)
+
+| | Before | After (384) | After (`OBB_IMGSZ=256`) |
+|---|---|---|---|
+| Loop rate | 16.5 fps | 30 fps | 30 fps |
+| Frame delivered -> MIDI | ~56 ms (incl. wait for frame) | ~18 ms mean | ~12 ms mean |
+
+Occasional single-frame spikes of 50-100 ms remain. Figures exclude the
+camera's internal delay and Cubase's audio buffer.
+
+## Not verified
+
+- No sound test in Cubase and no hands-in-frame test of gestures/looper were
+  run in this session; 256 px accuracy for pitch/volume is unchecked.
+- Cubase side effects to expect: Program Change now works (HALion Sonic);
+  looper is on channel 2 (track channel `1` merges, `Any` needs a slot-2 sound);
+  CC7 every frame fills recordings; ±2 semitone bend range assumed.
+
