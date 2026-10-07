@@ -718,3 +718,51 @@ camera's internal delay and Cubase's audio buffer.
   `min_confidence` (0.6) in `logic_obb.py`; `OBB_DEBUG=1` prints each detection.
 - Still not verified with real hands or sound.
 
+
+---
+
+# Session — New instrument repo + research repo rename (2026-10-07)
+
+## Request
+
+Does `midi-gesture-detection` on GitHub include the process of creating the
+instrument from scratch? If not, create a repo for that named
+`gesture-midi-instrument`, and rename the other to `midi-gesture-research`.
+
+## Finding
+
+No. That repo is the detector study only (dataset protocol, training drivers,
+evaluation, latency, figures). It has no camera, gesture->MIDI, looper or UI
+code. The instrument existed only in this folder (and in the private
+`Virtual_Hand-` remote, last pushed 2026-03-29).
+
+## Done
+
+- **New repo `hg5210187-ai/gesture-midi-instrument`** — created **PRIVATE**,
+  one commit, pushed. Local folder: `~/Documents/gesture-midi-instrument`
+  (a curated copy; this folder and its `Virtual_Hand-` remote were not touched).
+  - Code copied byte-for-byte from here: the four `main*.py`, all of `src/`,
+    the benchmark harness, `YOLO26*-ver`, `LICENSE`, `.python-version`.
+  - `pyproject.toml`: name/description changed; `uv.lock` re-locked (only the
+    root package name moved, no version changed).
+  - New docs: `README.md`, `docs/BUILD_FROM_SCRATCH.md` (11 dated stages from
+    the 2026-03-29 commit to the Core ML path, plus a from-zero build order),
+    `docs/ARCHITECTURE.md`, `docs/MODELS.md`.
+  - New `tests/check_headless.py`: synthetic detections through all three
+    logic modules, no camera/MIDI/UI. Passes.
+  - Left out on purpose: all weights (`*.pt`, `*.mlpackage`, `*.task`),
+    `logs/` (participant data), `runs/`, the screenshot, `Indigo Goals.pdf`,
+    and the raw session logs.
+- **Renamed** `midi-gesture-detection` -> `midi-gesture-research` (still
+  public; the old URL redirects). Updated `origin` in its local clone,
+  `~/Documents/MIDI-Dataset/v2-study`.
+
+## Open
+
+- The new repo is private until reviewed. To publish:
+  `gh repo edit hg5210187-ai/gesture-midi-instrument --visibility public --accept-visibility-change-consequences`
+- No weights are published, so only `main_mediapipe.py` runs from a fresh
+  clone (public Google model). Decide whether to attach `hbb-s-fold1-320`
+  (and the rotation models) to a GitHub release.
+- The research README does not link to the instrument repo yet.
+- Code changed here from now on has to be copied to the new repo by hand.
