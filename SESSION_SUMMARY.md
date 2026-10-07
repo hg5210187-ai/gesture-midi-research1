@@ -766,3 +766,42 @@ code. The instrument existed only in this folder (and in the private
   (and the rotation models) to a GitHub release.
 - The research README does not link to the instrument repo yet.
 - Code changed here from now on has to be copied to the new repo by hand.
+
+## Follow-up — weights published, model procedures written, copy in `gesture-midi-research1` (2026-10-07)
+
+Request: add `hbb-s-fold1-320` and the rotation models; write the procedure
+for every model made, in order; mark `hbb-s-fold1-320` as the preferred model
+with guided links to the research repo; paste the new repo into
+`gesture-midi-research1`; keep it private until reviewed.
+
+- **Weights**: attached to a GitHub release, tag `models-v1`, on both
+  `gesture-midi-instrument` and `gesture-midi-research1` — not committed to
+  git (`YOLO26x-MIDI.pt` is 126 MB, over GitHub's 100 MB file limit).
+  Assets: `hbb-s-fold1-320.pt`, `hbb-s-fold1-320.mlpackage.zip`,
+  `YOLO26{n,s,m,l,x}-MIDI.pt`, `SHA256SUMS.txt`.
+  Download: `gh release download models-v1 --pattern 'hbb-s-fold1-320.*'`.
+- **New `docs/MODEL_PROCEDURES.md`**: eight steps in order —
+  `right_hand_obb.pt` (06-28), `YOLO26n-MIDI.pt` (07-17), `YOLO26s/m/l/x`
+  (07-31), the 289-photo and 390-photo 5-fold studies and
+  `MIDI-gesture-model.pt` (08-04/05), the ablation pair + Optuna (08-06/07),
+  the research study and `hbb-s-fold1-320.pt` (08-11..13), the Core ML export
+  (10-05). Sources: checkpoint metadata, `~/Documents/MIDI-Dataset`
+  (`STUDY_NOTES.md`, `SESSION_2026-08-06.md`, training scripts and logs) and
+  the research repo.
+- README, `docs/MODELS.md`, `docs/BUILD_FROM_SCRATCH.md` updated: preferred
+  model called out, quick start runs `main_obb.py` first, stage 10 now covers
+  the first cross-validated study.
+- **`gesture-midi-research1`** (created by the user, private): the instrument
+  repo's tree was added as commits on top of its initial commit. Same content
+  as `gesture-midi-instrument`; the docs name neither repo, so they read
+  correctly in both.
+- Verified from a fresh clone of `gesture-midi-research1`: documented download
+  commands work, all 7 checksums match, every model loads, headless check
+  passes. Not verified: playing with a camera.
+- Both instrument repos are still **private**. `midi-gesture-research` was not
+  touched.
+
+Open: which of the two instrument repos to keep; the `.pt` files record their
+training folder paths (the rotation models include `/Users/ard/...`);
+`MIDI-gesture-model.pt` and `right_hand_obb.pt` are documented but not
+published.
