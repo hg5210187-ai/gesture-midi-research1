@@ -1,0 +1,22 @@
+{
+  "_comment": "Version + provenance for YOLO26s-MIDI.pt. Read by src/vision_yolo26.py (derived from the model filename). Bump version on retrain.",
+  "model_file": "YOLO26s-MIDI.pt",
+  "version": "1.0.0",
+  "task": "obb",
+  "classes": [
+    "thumbout",
+    "openhand",
+    "closedhand"
+  ],
+  "base_model": "yolo26s-obb.pt",
+  "dataset": "yolo_obb_midi",
+  "epochs": 100,
+  "imgsz_train": 640,
+  "imgsz_infer": 640,
+  "trained": "2026-07-31",
+  "ultralytics": "8.4.45",
+  "metrics_mAP50_95": 0.7725,
+  "infer_ms_at_640_mps": 34.6,
+  "approx_fps_640_mps": 28.9,
+  "used_by": "main_rotate.py --model s (rotation instrument)"
+}
